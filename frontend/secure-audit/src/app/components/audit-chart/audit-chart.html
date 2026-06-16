@@ -1,0 +1,94 @@
+<div class="chart-panel">
+
+  <!-- Header -->
+  <div class="chart-header">
+    <div class="chart-header-left">
+      <h3>Analytics</h3>
+      <span class="header-sub">Security audit insights</span>
+    </div>
+    @if (history.length > 0) {
+      <span class="audit-count">{{ history.length }} audit{{ history.length !== 1 ? 's' : '' }}</span>
+    }
+  </div>
+
+  <!-- Empty state -->
+  @if (history.length === 0) {
+    <div class="chart-empty">
+      <div class="empty-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M3 13h4v8H3zM9 9h4v12H9zM15 5h4v16h-4z" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <p>No data yet</p>
+      <span>Run a few audits and come back to see trends</span>
+    </div>
+  }
+
+  @if (history.length > 0) {
+
+    <!-- KPI cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <span class="kpi-value" [style.color]="avgRiskColor">{{ avgRisk }}</span>
+        <span class="kpi-label">Avg Risk Score</span>
+        <span class="kpi-sub">out of 100</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-value">{{ totalFindings }}</span>
+        <span class="kpi-label">Total Findings</span>
+        <span class="kpi-sub">across all audits</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-value critical-val">{{ criticalCount }}</span>
+        <span class="kpi-label">Critical Issues</span>
+        <span class="kpi-sub">require immediate action</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-value" style="text-transform: capitalize">{{ mostCommonSeverity }}</span>
+        <span class="kpi-label">Top Severity</span>
+        <span class="kpi-sub">most frequent finding</span>
+      </div>
+    </div>
+
+    <!-- Charts grid -->
+    <div class="charts-grid">
+
+      <!-- Severity donut -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <span class="chart-card-title">Severity Breakdown</span>
+          <span class="chart-card-badge">{{ totalFindings }} total</span>
+        </div>
+        <div class="donut-wrap">
+          <canvas #donutCanvas></canvas>
+        </div>
+      </div>
+
+      <!-- Bar chart -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <span class="chart-card-title">Findings by Severity</span>
+        </div>
+        <div class="canvas-wrap">
+          <canvas #barCanvas></canvas>
+        </div>
+      </div>
+
+      <!-- Line chart -->
+      @if (history.length > 1) {
+        <div class="chart-card wide">
+          <div class="chart-card-header">
+            <span class="chart-card-title">Risk Score Trend</span>
+            <span class="chart-card-badge trend-{{ riskTrend }}">
+              {{ riskTrend === 'up' ? '↑ Increasing' : riskTrend === 'down' ? '↓ Improving' : '→ Stable' }}
+            </span>
+          </div>
+          <div class="canvas-wrap tall">
+            <canvas #lineCanvas></canvas>
+          </div>
+        </div>
+      }
+
+    </div>
+  }
+</div>

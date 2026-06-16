@@ -4,12 +4,27 @@
   <div class="report-header">
     <div>
       <h2>Audit Report</h2>
-      <p class="checks-label">Checks: {{ report.checks_performed.join(' + ').toUpperCase() }}</p>
+      <p class="report-meta">
+        {{ report.checks_performed.join(' · ').toUpperCase() }}
+        <span class="meta-sep">·</span>
+        {{ auditDate }}
+      </p>
     </div>
     <div class="header-actions">
-      <button class="btn-copy" (click)="copyMarkdown()" title="Copy as Markdown">
-        📋 Copy
+      <button class="btn-action" (click)="toggleExpandAll()" title="Expand / collapse all findings">
+        {{ allExpanded ? '▲ Collapse All' : '▼ Expand All' }}
       </button>
+      <button class="btn-action" [class.copied]="copied" (click)="copyMarkdown()" title="Copy as Markdown">
+        {{ copied ? '✓ Copied!' : '⎘ Copy' }}
+      </button>
+      <button class="btn-action pdf" (click)="exportPdf()" title="Export as PDF">
+        ↓ PDF
+      </button>
+      @if (originalRequest) {
+        <button class="btn-action rerun" (click)="rerun.emit(originalRequest)" title="Re-run this audit">
+          ↺ Re-run
+        </button>
+      }
       <button class="btn-new" (click)="reset.emit()">
         ← New Audit
       </button>
@@ -20,17 +35,17 @@
   <div class="score-summary">
     <div class="score-ring">
       <svg viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r="40" fill="none" stroke="#1f2937" stroke-width="10"/>
+        <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" stroke-width="8"/>
         <circle
           cx="50" cy="50" r="40"
           fill="none"
           [attr.stroke]="riskColor"
-          stroke-width="10"
+          stroke-width="8"
           stroke-linecap="round"
           [attr.stroke-dasharray]="circumference"
           [attr.stroke-dashoffset]="dashOffset"
           transform="rotate(-90 50 50)"
-          style="transition: stroke-dashoffset 0.8s ease"/>
+          style="transition: stroke-dashoffset 0.8s ease;"/>
       </svg>
       <div class="score-text">
         <span class="score-number" [style.color]="riskColor">{{ report.risk_score }}</span>
@@ -38,13 +53,23 @@
       </div>
     </div>
     <div class="summary-block">
-      <div class="risk-label" [style.color]="riskColor">{{ riskLabel }}</div>
+      <div class="summary-top">
+        <span class="risk-badge" [style.--risk-color]="riskColor">{{ riskLabel }}</span>
+        <div class="finding-counts">
+          @for (s of severities; track s) {
+            @if (countBySeverity(s) > 0) {
+              <span class="count-pill" [class]="s">{{ countBySeverity(s) }} {{ s }}</span>
+            }
+          }
+        </div>
+      </div>
       <p class="summary-text">{{ report.summary }}</p>
     </div>
   </div>
 
-  <!-- Severity breakdown -->
+  <!-- Severity filter -->
   <div class="severity-breakdown">
+    <span class="filter-label">Filter:</span>
     <button
       class="sev-chip all"
       [class.active]="activeFilter === 'all'"
@@ -70,7 +95,7 @@
       <div class="no-findings">No findings for this filter.</div>
     }
     @for (finding of filteredFindings; track finding.id) {
-      <app-finding-card [finding]="finding" />
+      <app-finding-card [finding]="finding" [forceExpanded]="allExpanded" />
     }
   </div>
 

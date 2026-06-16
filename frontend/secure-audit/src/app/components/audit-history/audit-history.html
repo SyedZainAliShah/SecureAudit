@@ -1,0 +1,88 @@
+<div class="history-panel">
+  <div class="history-header">
+    <h3>Audit History</h3>
+    <button class="btn-refresh" (click)="refresh()" title="Refresh">↻</button>
+  </div>
+
+  @if (!loading && history.length > 0) {
+    <div class="history-controls">
+      <input class="search-input" [(ngModel)]="searchQuery" placeholder="Search audits..." />
+      <select class="filter-select" [(ngModel)]="minRiskScore">
+        <option [value]="0">All risk levels</option>
+        <option [value]="85">Critical (85+)</option>
+        <option [value]="60">High (60+)</option>
+        <option [value]="35">Medium (35+)</option>
+      </select>
+      <select class="filter-select" [(ngModel)]="sortBy">
+        <option value="date">Newest first</option>
+        <option value="risk">Highest risk</option>
+      </select>
+    </div>
+  }
+
+  @if (loading) {
+    <div class="history-loading"><div class="mini-spinner"></div></div>
+  }
+
+  @if (!loading && history.length === 0) {
+    <div class="history-empty">
+      <div class="empty-icon">📋</div>
+      <p>No audits yet.</p>
+      <span>Run your first audit to see history here.</span>
+    </div>
+  }
+
+  @if (!loading && history.length > 0 && filtered.length === 0) {
+    <div class="history-empty">
+      <div class="empty-icon">🔍</div>
+      <p>No results.</p>
+      <span>Try adjusting your search or filters.</span>
+    </div>
+  }
+
+  @if (!loading && filtered.length > 0) {
+    <div class="history-list">
+      @for (item of filtered; track item.id) {
+        <div class="history-item" (click)="loadAudit.emit(item.id)">
+          <div class="item-header">
+            <span class="risk-badge" [style.background]="riskColor(item.risk_score) + '22'" [style.color]="riskColor(item.risk_score)">
+              {{ item.risk_score }}
+            </span>
+            <span class="item-meta">
+              <span class="item-type">{{ item.input_type }}</span>
+              @if (item.language && item.input_type === 'code') {
+                <span class="item-lang">{{ item.language }}</span>
+              }
+            </span>
+            <button class="btn-delete" (click)="delete(item.id, $event)" title="Delete">✕</button>
+          </div>
+          <p class="item-preview">{{ item.input_preview }}</p>
+          <div class="item-footer">
+            <div class="sev-dots">
+              @if (item.finding_counts['critical'] > 0) {
+                <span class="dot critical">{{ item.finding_counts['critical'] }}C</span>
+              }
+              @if (item.finding_counts['high'] > 0) {
+                <span class="dot high">{{ item.finding_counts['high'] }}H</span>
+              }
+              @if (item.finding_counts['medium'] > 0) {
+                <span class="dot medium">{{ item.finding_counts['medium'] }}M</span>
+              }
+              @if (item.finding_counts['low'] > 0) {
+                <span class="dot low">{{ item.finding_counts['low'] }}L</span>
+              }
+              @if (totalFindings(item.finding_counts) === 0) {
+                <span class="dot info">✓ Clean</span>
+              }
+            </div>
+            <span class="item-date">{{ formatDate(item.created_at) }}</span>
+          </div>
+        </div>
+      }
+    </div>
+
+    @if (history.length > filtered.length) {
+      <div class="filter-count">Showing {{ filtered.length }} of {{ history.length }}</div>
+    }
+  }
+</div>

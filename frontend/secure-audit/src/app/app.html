@@ -3,63 +3,98 @@
   <!-- Navbar -->
   <nav class="navbar">
     <div class="navbar-inner">
-      <div class="brand">
-        <span class="brand-icon">🔐</span>
+      <div class="brand" (click)="switchTab('audit'); reset()" style="cursor:pointer">
+        <svg class="brand-shield" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.25C16.5 22.15 20 17.25 20 12V6L12 2z" fill="rgba(59,130,246,0.2)" stroke="#3b82f6" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M9 12l2 2 4-4" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
         <span class="brand-name">SecureAudit</span>
         <span class="brand-tag">AI-Powered</span>
       </div>
-      <div class="nav-links">
-        <a href="https://owasp.org/Top10/" target="_blank" class="nav-link">OWASP</a>
-        <a href="https://gdpr.eu/" target="_blank" class="nav-link">GDPR</a>
-        <a href="https://github.com/SyedZainAliShah/SecureAudit" target="_blank" class="nav-link github">
-          ⭐ GitHub
-        </a>
+      <div class="nav-tabs">
+        <button class="nav-tab" [class.active]="activeTab === 'audit'" (click)="switchTab('audit')">Audit</button>
+        <button class="nav-tab" [class.active]="activeTab === 'history'" (click)="switchTab('history')">History</button>
+        <button class="nav-tab" [class.active]="activeTab === 'analytics'" (click)="switchTab('analytics')">Analytics</button>
       </div>
+      <a href="https://github.com/SyedZainAliShah/SecureAudit" target="_blank" class="nav-github">⭐ GitHub</a>
     </div>
   </nav>
 
-  <!-- Hero -->
-  @if (!report && !loading) {
-    <div class="hero">
-      <h1>AI-Powered Security & Compliance Auditing</h1>
-      <p>Paste your code or describe your system to detect OWASP Top 10 vulnerabilities and GDPR compliance gaps — powered by a local LLM via Ollama.</p>
-      <div class="hero-chips">
-        <span class="chip">🔒 OWASP Top 10</span>
-        <span class="chip">🇪🇺 GDPR</span>
-        <span class="chip">🤖 Ollama (local LLM)</span>
-        <span class="chip">🚀 Angular + FastAPI</span>
-      </div>
-    </div>
-  }
-
-  <!-- Main content -->
   <main class="main-content">
 
-    <!-- Loading state -->
-    @if (loading) {
-      <div class="loading-screen">
-        <div class="loading-spinner"></div>
-        <h3>Analyzing with AI...</h3>
-        <p>This may take 20–60 seconds depending on your Ollama model.</p>
+    <!-- ── AUDIT TAB ── -->
+    @if (activeTab === 'audit') {
+
+      @if (!report && !loading) {
+        <div class="hero">
+          <h1>AI Security & Compliance Auditing</h1>
+          <p>Detect OWASP Top 10 vulnerabilities and GDPR compliance gaps in seconds — powered by a local LLM.</p>
+          <div class="hero-chips">
+            <span class="chip">🔒 OWASP Top 10</span>
+            <span class="chip">🇪🇺 GDPR</span>
+            <span class="chip">⚡ Real-time Streaming</span>
+            <span class="chip">🗄️ PostgreSQL History</span>
+          </div>
+        </div>
+        <app-audit-form [prefill]="prefillRequest" (submitted)="onAuditSubmit($event)" />
+      }
+
+      @if (error) {
+        <div class="error-banner">
+          <span>⚠️ {{ error }}</span>
+          <button (click)="reset()">✕</button>
+        </div>
+      }
+
+      <!-- Streaming loading state -->
+      @if (loading && streaming) {
+        <div class="stream-loading">
+
+          <div class="stream-status">
+            <div class="ai-pulse">
+              <span></span><span></span><span></span>
+            </div>
+            <span class="stream-msg">{{ streamMessage }}</span>
+          </div>
+
+          @if (streamFindings.length > 0) {
+            <div class="stream-findings">
+              <p class="stream-findings-label">Findings discovered so far</p>
+              @for (f of streamFindings; track f.id) {
+                <div class="stream-finding-chip" [class]="f.severity">
+                  <span class="sev">{{ f.severity }}</span>
+                  <span class="title">{{ f.title }}</span>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="stream-placeholder">
+              <div class="placeholder-line w-60"></div>
+              <div class="placeholder-line w-80"></div>
+              <div class="placeholder-line w-50"></div>
+            </div>
+          }
+
+        </div>
+      }
+
+      @if (report && !loading) {
+        <app-audit-report [report]="report" [originalRequest]="lastRequest" (reset)="reset()" (rerun)="onRerun($event)" />
+      }
+    }
+
+    <!-- ── HISTORY TAB ── -->
+    @if (activeTab === 'history') {
+      <div class="tab-layout">
+        <app-audit-history (loadAudit)="loadAuditFromHistory($event)" />
       </div>
     }
 
-    <!-- Error state -->
-    @if (error) {
-      <div class="error-banner">
-        <span>⚠️ {{ error }}</span>
-        <button (click)="error = null">✕</button>
+    <!-- ── ANALYTICS TAB ── -->
+    @if (activeTab === 'analytics') {
+      <div class="tab-layout">
+        <app-audit-chart [history]="history" />
       </div>
-    }
-
-    <!-- Form -->
-    @if (!report && !loading) {
-      <app-audit-form (submitted)="onAuditSubmit($event)" />
-    }
-
-    <!-- Report -->
-    @if (report && !loading) {
-      <app-audit-report [report]="report" (reset)="reset()" />
     }
 
   </main>

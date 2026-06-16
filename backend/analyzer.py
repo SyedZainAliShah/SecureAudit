@@ -1,6 +1,7 @@
 import httpx
 import json
 import re
+from typing import AsyncGenerator
 from models import AuditRequest, AuditReport, Finding
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
@@ -36,12 +37,56 @@ GDPR compliance principles to check for:
 """
 
 
+SECRETS_CONTEXT = """
+Secret Detection — check for hardcoded sensitive values:
+- Hardcoded passwords, API keys, tokens, or secrets in source code
+- Private keys or certificates embedded in code
+- Database connection strings with credentials
+- AWS/GCP/Azure access keys or secrets
+- JWT secrets or signing keys
+- OAuth client secrets
+- Any string matching patterns like: password=, secret=, api_key=, token=, private_key=
+- Credentials in config files, .env files committed to code, or default credentials left in place
+"""
+
+PCI_DSS_CONTEXT = """
+PCI DSS (Payment Card Industry Data Security Standard) — check for:
+- Req 3: Cardholder data (PAN, CVV, expiry) stored unencrypted or logged
+- Req 3: Full card numbers visible in logs, error messages, or API responses
+- Req 4: Cardholder data transmitted without TLS/encryption
+- Req 6: Vulnerable functions used in payment flows (SQL injection, XSS vectors)
+- Req 7/8: Missing access controls or authentication on payment endpoints
+- Req 10: Insufficient audit logging for payment transactions
+- Req 6.4: Hardcoded credentials or default passwords in payment systems
+- Any storage or logging of CVV/CVC/CVV2, magnetic stripe data, or PIN blocks
+"""
+
+HIPAA_CONTEXT = """
+HIPAA (Health Insurance Portability and Accountability Act) — check for:
+- PHI (Protected Health Information) stored without encryption: names, DOB, SSN, diagnosis, medications, health records
+- PHI transmitted without TLS or over unencrypted channels
+- Missing access controls or audit logging on endpoints handling health data
+- PHI logged in application logs, error messages, or debug output
+- Insufficient de-identification of health data
+- Missing data retention and destruction policies in code
+- No minimum necessary principle — accessing more PHI than required for the function
+- Missing Business Associate Agreement indicators in third-party data sharing
+- Health data exposed in API responses without role-based access control
+"""
+
+
 def build_prompt(req: AuditRequest) -> str:
     check_sections = []
     if "owasp" in req.checks:
         check_sections.append(OWASP_CONTEXT)
     if "gdpr" in req.checks:
         check_sections.append(GDPR_CONTEXT)
+    if "secrets" in req.checks:
+        check_sections.append(SECRETS_CONTEXT)
+    if "pci" in req.checks:
+        check_sections.append(PCI_DSS_CONTEXT)
+    if "hipaa" in req.checks:
+        check_sections.append(HIPAA_CONTEXT)
 
     input_description = (
         f"the following {req.language} code"
@@ -49,81 +94,104 @@ def build_prompt(req: AuditRequest) -> str:
         else "the following system/feature description"
     )
 
-    return f"""You are a senior security and compliance auditor. Analyze {input_description} and identify security vulnerabilities and compliance issues.
+    return f"""<SYSTEM>You are a JSON API. You output only raw JSON. You never write explanations, preambles, or markdown. Your entire response must be a single valid JSON object starting with {{ and ending with }}.</SYSTEM>
+
+Analyze {input_description} for security vulnerabilities and compliance issues.
 
 {chr(10).join(check_sections)}
 
-INPUT TO ANALYZE:
-```
+INPUT:
 {req.input}
-```
 
-Return ONLY a valid JSON object with this exact structure (no markdown, no explanation outside the JSON):
+OUTPUT (raw JSON only, nothing else):
 {{
-  "summary": "2-3 sentence executive summary of the overall risk posture",
-  "risk_score": <integer 0-100, where 0=no risk, 100=critical>,
+  "summary": "2-3 sentence executive summary",
+  "risk_score": <integer 0-100: 85-100 if critical findings, 60-84 if high, 35-59 if medium, 10-34 if low, 0-9 if info only>,
   "findings": [
     {{
       "id": "F001",
       "category": "<OWASP category or GDPR article>",
       "title": "<short title>",
       "severity": "<critical|high|medium|low|info>",
-      "description": "<what the issue is and why it matters>",
-      "recommendation": "<specific actionable fix>",
-      "line_reference": "<line numbers if applicable, otherwise null>"
+      "description": "<what the issue is>",
+      "recommendation": "<specific fix>",
+      "line_reference": "<line numbers or null>"
     }}
   ],
   "checks_performed": {json.dumps(req.checks)},
   "input_type": "{req.input_type}"
-}}
-
-Rules:
-- Only report real issues you can identify. Do not invent findings.
-- If no issues found in a category, do not add a finding for it.
-- severity must be one of: critical, high, medium, low, info
-- risk_score should reflect the worst finding (critical=80-100, high=60-79, medium=40-59, low=20-39, all info=0-19)
-- Return valid JSON only. No markdown fences. No text before or after the JSON.
-"""
+}}"""
 
 
 def extract_json(text: str) -> dict:
     """Extract JSON from model output even if it has extra text."""
+    text = text.strip()
+
     # Try direct parse first
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Strip markdown fences
+    text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.MULTILINE)
+    text = re.sub(r'\s*```$', '', text, flags=re.MULTILINE)
     try:
         return json.loads(text.strip())
     except json.JSONDecodeError:
         pass
 
-    # Try to find JSON block
-    match = re.search(r'\{.*\}', text, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group())
-        except json.JSONDecodeError:
-            pass
+    # Find the outermost { ... } by bracket matching
+    start = text.find('{')
+    if start != -1:
+        depth = 0
+        for i, ch in enumerate(text[start:], start):
+            if ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0:
+                    candidate = text[start:i+1]
+                    try:
+                        return json.loads(candidate)
+                    except json.JSONDecodeError:
+                        break
 
-    raise ValueError(f"Could not extract valid JSON from model output:\n{text[:500]}")
+    # Last resort: truncated JSON — close any open brackets and retry
+    if start != -1:
+        fragment = text[start:]
+        open_braces = fragment.count('{') - fragment.count('}')
+        open_brackets = fragment.count('[') - fragment.count(']')
+        # Remove the last incomplete object (find last complete finding)
+        last_complete = fragment.rfind('},')
+        if last_complete != -1:
+            fragment = fragment[:last_complete + 1]
+            fragment += ']' * max(open_brackets - 1, 0)
+            fragment += '}' * max(open_braces - 1, 0)
+            fragment = fragment.rstrip(',') + ']}'
+            try:
+                return json.loads(fragment)
+            except json.JSONDecodeError:
+                pass
+
+    raise ValueError(f"Could not extract valid JSON from model output: {text[:300]}")
 
 
 async def run_audit(req: AuditRequest) -> AuditReport:
+    """Non-streaming audit — waits for full response."""
     prompt = build_prompt(req)
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
+    async with httpx.AsyncClient(timeout=180.0) as client:
         response = await client.post(OLLAMA_URL, json={
             "model": OLLAMA_MODEL,
             "prompt": prompt,
             "stream": False,
-            "options": {
-                "temperature": 0.1,   # low temp = more deterministic, better for structured output
-                "num_predict": 2048,
-            }
+            "options": {"temperature": 0.1, "num_predict": -1},
         })
         response.raise_for_status()
 
     raw = response.json().get("response", "")
     data = extract_json(raw)
-
-    # Validate and build findings
     findings = [Finding(**f) for f in data.get("findings", [])]
 
     return AuditReport(
@@ -133,3 +201,83 @@ async def run_audit(req: AuditRequest) -> AuditReport:
         checks_performed=data.get("checks_performed", req.checks),
         input_type=req.input_type,
     )
+
+
+async def stream_audit(req: AuditRequest) -> AsyncGenerator[str, None]:
+    """
+    Streaming audit using SSE.
+    Yields server-sent event strings.
+    Emits:
+      - status events while Ollama is generating
+      - finding events as each finding is parsed
+      - complete event with the full report
+      - error event on failure
+    """
+    prompt = build_prompt(req)
+
+    def sse(event: str, data: dict) -> str:
+        return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+    yield sse("status", {"message": "Connecting to Ollama...", "progress": 5})
+
+    collected = ""
+    token_count = 0
+
+    try:
+        async with httpx.AsyncClient(timeout=180.0) as client:
+            async with client.stream("POST", OLLAMA_URL, json={
+                "model": OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": True,
+                "options": {"temperature": 0.1, "num_predict": -1},
+            }) as response:
+                response.raise_for_status()
+
+                yield sse("status", {"message": "Analyzing your code...", "progress": 15})
+
+                async for line in response.aiter_lines():
+                    if not line.strip():
+                        continue
+                    try:
+                        chunk = json.loads(line)
+                        token = chunk.get("response", "")
+                        collected += token
+                        token_count += 1
+
+                        # Emit progress every 50 tokens
+                        if token_count % 50 == 0:
+                            progress = min(15 + int((token_count / 800) * 60), 75)
+                            yield sse("status", {"message": "Identifying vulnerabilities...", "progress": progress})
+
+                        if chunk.get("done"):
+                            break
+                    except json.JSONDecodeError:
+                        continue
+
+        yield sse("status", {"message": "Parsing findings...", "progress": 80})
+
+        data = extract_json(collected)
+        findings = [Finding(**f) for f in data.get("findings", [])]
+
+        # Stream each finding individually for dramatic effect
+        for i, finding in enumerate(findings):
+            yield sse("finding", {
+                "finding": finding.model_dump(),
+                "index": i,
+                "total": len(findings),
+            })
+
+        yield sse("status", {"message": "Finalising report...", "progress": 95})
+
+        report = AuditReport(
+            summary=data["summary"],
+            risk_score=int(data["risk_score"]),
+            findings=findings,
+            checks_performed=data.get("checks_performed", req.checks),
+            input_type=req.input_type,
+        )
+
+        yield sse("complete", {"report": report.model_dump()})
+
+    except Exception as e:
+        yield sse("error", {"message": str(e)})

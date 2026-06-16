@@ -1,29 +1,87 @@
 <div class="audit-form">
-  <div class="form-header">
-    <h2>Submit for Audit</h2>
-    <p class="subtitle">Paste code or describe your system to check for OWASP & GDPR issues.</p>
-  </div>
 
   <!-- Input type toggle -->
   <div class="toggle-group">
-    <button
-      class="toggle-btn"
-      [class.active]="inputType === 'code'"
-      (click)="inputType = 'code'">
-      <span class="icon">⌨️</span> Code Snippet
+    <button class="toggle-btn" [class.active]="inputType === 'code'" (click)="setInputType('code')">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M5.78 12.854l-4-4a.75.75 0 010-1.06l4-4a.75.75 0 111.06 1.06L3.311 8.323l3.53 3.47a.75.75 0 11-1.06 1.06zm4.44 0a.75.75 0 111.06-1.06l3.53-3.47-3.53-3.47a.75.75 0 111.06-1.06l4 4a.75.75 0 010 1.06l-4 4a.75.75 0 01-1.06 0z"/></svg>
+      Code Snippet
     </button>
-    <button
-      class="toggle-btn"
-      [class.active]="inputType === 'description'"
-      (click)="inputType = 'description'">
-      <span class="icon">📝</span> System Description
+    <button class="toggle-btn" [class.active]="inputType === 'github'" (click)="setInputType('github')">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub Repo
+    </button>
+    <button class="toggle-btn" [class.active]="inputType === 'description'" (click)="setInputType('description')">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1V9h-8c-.356 0-.694.074-1 .208V3.75c0-.138.112-.25.25-.25h9z"/></svg>
+      Description
     </button>
   </div>
 
-  <!-- Language selector (code only) -->
+  <!-- GitHub URL input -->
+  @if (inputType === 'github') {
+    <div class="github-input-block">
+      <div class="github-url-row">
+        <div class="url-input-wrap">
+          <svg class="url-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          <input
+            type="url"
+            class="url-input"
+            [(ngModel)]="githubUrl"
+            placeholder="https://github.com/owner/repo"
+            (keyup.enter)="fetchGithub()" />
+        </div>
+        <button class="btn-fetch" (click)="fetchGithub()" [disabled]="githubFetching || !githubUrl.trim()">
+          @if (githubFetching) {
+            <span class="mini-spinner"></span> Fetching...
+          } @else {
+            Fetch Repo
+          }
+        </button>
+      </div>
+
+      @if (githubError) {
+        <p class="github-error">{{ githubError }}</p>
+      }
+
+      @if (githubInfo) {
+        <div class="github-info">
+          <span class="github-repo-name">{{ githubInfo.repo }}</span>
+          <span class="github-file-count">{{ githubInfo.files.length }} files fetched</span>
+          @if (githubInfo.truncated) {
+            <span class="github-truncated">⚠ Truncated to 7,500 chars</span>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- File upload drop zone (shown when code or after toggle) -->
   @if (inputType === 'code') {
+    <div
+      class="drop-zone"
+      [class.dragging]="isDragging"
+      [class.has-file]="uploadedFileName"
+      (dragover)="onDropzoneDragOver($event)"
+      (dragleave)="onDropzoneDragLeave()"
+      (drop)="onDropzoneDrop($event)"
+      (click)="fileInput.click()">
+      @if (uploadedFileName) {
+        <span class="dz-file-name">📄 {{ uploadedFileName }}</span>
+        <span class="dz-hint">Click to replace</span>
+      } @else {
+        <span class="dz-icon">↑</span>
+        <span class="dz-label">Drop a file or click to upload</span>
+        <span class="dz-hint">.py .js .ts .java .go .rb .php and more</span>
+      }
+      <input #fileInput type="file" hidden
+        accept=".py,.js,.ts,.java,.go,.rb,.php,.cs,.cpp,.c,.rs,.kt,.jsx,.tsx,.sh"
+        (change)="onFileSelected($event)" />
+    </div>
+  }
+
+  <!-- Language selector -->
+  @if (inputType === 'code' || inputType === 'github') {
     <div class="field">
-      <label>Programming Language</label>
+      <label>Language</label>
       <select [(ngModel)]="language">
         @for (lang of languages; track lang) {
           <option [value]="lang">{{ lang }}</option>
@@ -34,33 +92,62 @@
 
   <!-- Checks -->
   <div class="field">
-    <label>Checks to Run</label>
+    <label>Checks</label>
     <div class="checkbox-group">
       <label class="checkbox-label">
         <input type="checkbox" [(ngModel)]="checks['owasp']" />
-        <span class="check-badge owasp">OWASP Top 10</span>
-        <span class="check-desc">Security vulnerabilities</span>
+        <span class="check-content">
+          <span class="check-badge owasp">OWASP Top 10</span>
+          <span class="check-desc">Security vulnerabilities</span>
+        </span>
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="checks['secrets']" />
+        <span class="check-content">
+          <span class="check-badge secrets">Secrets</span>
+          <span class="check-desc">Hardcoded credentials & keys</span>
+        </span>
       </label>
       <label class="checkbox-label">
         <input type="checkbox" [(ngModel)]="checks['gdpr']" />
-        <span class="check-badge gdpr">GDPR</span>
-        <span class="check-desc">Privacy & compliance</span>
+        <span class="check-content">
+          <span class="check-badge gdpr">GDPR</span>
+          <span class="check-desc">EU privacy compliance</span>
+        </span>
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="checks['pci']" />
+        <span class="check-content">
+          <span class="check-badge pci">PCI DSS</span>
+          <span class="check-desc">Payment card data security</span>
+        </span>
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="checks['hipaa']" />
+        <span class="check-content">
+          <span class="check-badge hipaa">HIPAA</span>
+          <span class="check-desc">Healthcare data protection</span>
+        </span>
       </label>
     </div>
   </div>
 
-  <!-- Text input -->
+  <!-- Text area -->
   <div class="field">
     <label>
-      {{ inputType === 'code' ? 'Code Snippet' : 'System Description' }}
-      <span class="char-count" [class.over]="charCount > 7500">{{ charCount }} / 8000</span>
+      {{ inputType === 'description' ? 'System Description' : 'Code' }}
+      @if (inputType === 'github' && !githubInfo) {
+        <span class="char-hint">Fetch a repo above to populate this</span>
+      } @else {
+        <span class="char-count" [class.over]="charCount > 7500">{{ charCount | number }} / 8,000</span>
+      }
     </label>
     <textarea
       [(ngModel)]="inputText"
-      [placeholder]="inputType === 'code'
-        ? 'Paste your code here...'
-        : 'Describe your system, data flows, or architecture...'"
-      rows="14"
+      [placeholder]="inputType === 'description'
+        ? 'Describe your system, data flows, or architecture...'
+        : 'Paste your code here...'"
+      rows="12"
       maxlength="8000"
       class="code-input">
     </textarea>
@@ -68,18 +155,14 @@
 
   <!-- Actions -->
   <div class="form-actions">
-    <button class="btn-example" (click)="loadExample()" type="button">
-      Load Example
-    </button>
-    <button
-      class="btn-submit"
-      (click)="onSubmit()"
-      [disabled]="!isValid || loading">
+    <button class="btn-example" (click)="loadExample()" type="button">Load Example</button>
+    <button class="btn-submit" (click)="onSubmit()" [disabled]="!isValid || loading">
       @if (loading) {
         <span class="spinner"></span> Analyzing...
       } @else {
-        🔍 Run Audit
+        Run Audit
       }
     </button>
   </div>
+
 </div>
