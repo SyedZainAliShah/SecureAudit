@@ -1,0 +1,72 @@
+<div class="app-shell">
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="navbar-inner">
+      <div class="brand">
+        <span class="brand-icon">🔐</span>
+        <span class="brand-name">SecureAudit</span>
+        <span class="brand-tag">AI-Powered</span>
+      </div>
+      <div class="nav-links">
+        <a href="https://owasp.org/Top10/" target="_blank" class="nav-link">OWASP</a>
+        <a href="https://gdpr.eu/" target="_blank" class="nav-link">GDPR</a>
+        <a href="https://github.com/SyedZainAliShah/SecureAudit" target="_blank" class="nav-link github">
+          ⭐ GitHub
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  @if (!report && !loading) {
+    <div class="hero">
+      <h1>AI-Powered Security & Compliance Auditing</h1>
+      <p>Paste your code or describe your system to detect OWASP Top 10 vulnerabilities and GDPR compliance gaps — powered by a local LLM via Ollama.</p>
+      <div class="hero-chips">
+        <span class="chip">🔒 OWASP Top 10</span>
+        <span class="chip">🇪🇺 GDPR</span>
+        <span class="chip">🤖 Ollama (local LLM)</span>
+        <span class="chip">🚀 Angular + FastAPI</span>
+      </div>
+    </div>
+  }
+
+  <!-- Main content -->
+  <main class="main-content">
+
+    <!-- Loading state -->
+    @if (loading) {
+      <div class="loading-screen">
+        <div class="loading-spinner"></div>
+        <h3>Analyzing with AI...</h3>
+        <p>This may take 20–60 seconds depending on your Ollama model.</p>
+      </div>
+    }
+
+    <!-- Error state -->
+    @if (error) {
+      <div class="error-banner">
+        <span>⚠️ {{ error }}</span>
+        <button (click)="error = null">✕</button>
+      </div>
+    }
+
+    <!-- Form -->
+    @if (!report && !loading) {
+      <app-audit-form (submitted)="onAuditSubmit($event)" />
+    }
+
+    <!-- Report -->
+    @if (report && !loading) {
+      <app-audit-report [report]="report" (reset)="reset()" />
+    }
+
+  </main>
+
+  <footer class="footer">
+    Built with Angular & FastAPI · Powered by Ollama ·
+    <a href="https://github.com/SyedZainAliShah" target="_blank">@SyedZainAliShah</a>
+  </footer>
+
+</div>

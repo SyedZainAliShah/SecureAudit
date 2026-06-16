@@ -1,0 +1,77 @@
+<div class="audit-report">
+
+  <!-- Header -->
+  <div class="report-header">
+    <div>
+      <h2>Audit Report</h2>
+      <p class="checks-label">Checks: {{ report.checks_performed.join(' + ').toUpperCase() }}</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-copy" (click)="copyMarkdown()" title="Copy as Markdown">
+        📋 Copy
+      </button>
+      <button class="btn-new" (click)="reset.emit()">
+        ← New Audit
+      </button>
+    </div>
+  </div>
+
+  <!-- Score + Summary -->
+  <div class="score-summary">
+    <div class="score-ring">
+      <svg viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="40" fill="none" stroke="#1f2937" stroke-width="10"/>
+        <circle
+          cx="50" cy="50" r="40"
+          fill="none"
+          [attr.stroke]="riskColor"
+          stroke-width="10"
+          stroke-linecap="round"
+          [attr.stroke-dasharray]="circumference"
+          [attr.stroke-dashoffset]="dashOffset"
+          transform="rotate(-90 50 50)"
+          style="transition: stroke-dashoffset 0.8s ease"/>
+      </svg>
+      <div class="score-text">
+        <span class="score-number" [style.color]="riskColor">{{ report.risk_score }}</span>
+        <span class="score-label">/ 100</span>
+      </div>
+    </div>
+    <div class="summary-block">
+      <div class="risk-label" [style.color]="riskColor">{{ riskLabel }}</div>
+      <p class="summary-text">{{ report.summary }}</p>
+    </div>
+  </div>
+
+  <!-- Severity breakdown -->
+  <div class="severity-breakdown">
+    <button
+      class="sev-chip all"
+      [class.active]="activeFilter === 'all'"
+      (click)="activeFilter = 'all'">
+      All <span class="count">{{ report.findings.length }}</span>
+    </button>
+    @for (s of severities; track s) {
+      @if (countBySeverity(s) > 0) {
+        <button
+          class="sev-chip"
+          [class]="s"
+          [class.active]="activeFilter === s"
+          (click)="activeFilter = s">
+          {{ s }} <span class="count">{{ countBySeverity(s) }}</span>
+        </button>
+      }
+    }
+  </div>
+
+  <!-- Findings -->
+  <div class="findings-list">
+    @if (filteredFindings.length === 0) {
+      <div class="no-findings">No findings for this filter.</div>
+    }
+    @for (finding of filteredFindings; track finding.id) {
+      <app-finding-card [finding]="finding" />
+    }
+  </div>
+
+</div>

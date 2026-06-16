@@ -1,0 +1,85 @@
+<div class="audit-form">
+  <div class="form-header">
+    <h2>Submit for Audit</h2>
+    <p class="subtitle">Paste code or describe your system to check for OWASP & GDPR issues.</p>
+  </div>
+
+  <!-- Input type toggle -->
+  <div class="toggle-group">
+    <button
+      class="toggle-btn"
+      [class.active]="inputType === 'code'"
+      (click)="inputType = 'code'">
+      <span class="icon">⌨️</span> Code Snippet
+    </button>
+    <button
+      class="toggle-btn"
+      [class.active]="inputType === 'description'"
+      (click)="inputType = 'description'">
+      <span class="icon">📝</span> System Description
+    </button>
+  </div>
+
+  <!-- Language selector (code only) -->
+  @if (inputType === 'code') {
+    <div class="field">
+      <label>Programming Language</label>
+      <select [(ngModel)]="language">
+        @for (lang of languages; track lang) {
+          <option [value]="lang">{{ lang }}</option>
+        }
+      </select>
+    </div>
+  }
+
+  <!-- Checks -->
+  <div class="field">
+    <label>Checks to Run</label>
+    <div class="checkbox-group">
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="checks['owasp']" />
+        <span class="check-badge owasp">OWASP Top 10</span>
+        <span class="check-desc">Security vulnerabilities</span>
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" [(ngModel)]="checks['gdpr']" />
+        <span class="check-badge gdpr">GDPR</span>
+        <span class="check-desc">Privacy & compliance</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Text input -->
+  <div class="field">
+    <label>
+      {{ inputType === 'code' ? 'Code Snippet' : 'System Description' }}
+      <span class="char-count" [class.over]="charCount > 7500">{{ charCount }} / 8000</span>
+    </label>
+    <textarea
+      [(ngModel)]="inputText"
+      [placeholder]="inputType === 'code'
+        ? 'Paste your code here...'
+        : 'Describe your system, data flows, or architecture...'"
+      rows="14"
+      maxlength="8000"
+      class="code-input">
+    </textarea>
+  </div>
+
+  <!-- Actions -->
+  <div class="form-actions">
+    <button class="btn-example" (click)="loadExample()" type="button">
+      Load Example
+    </button>
+    <button
+      class="btn-submit"
+      (click)="onSubmit()"
+      [disabled]="!isValid || loading">
+      @if (loading) {
+        <span class="spinner"></span> Analyzing...
+      } @else {
+        🔍 Run Audit
+      }
+    </button>
+  </div>
+</div>

@@ -1,0 +1,31 @@
+<div class="finding-card" [class]="finding.severity" (click)="expanded = !expanded">
+  <div class="card-header">
+    <div class="left">
+      <span class="severity-badge" [class]="finding.severity">
+        {{ severityIcon }} {{ severityLabel }}
+      </span>
+      <span class="category">{{ finding.category }}</span>
+    </div>
+    <div class="right">
+      @if (finding.line_reference) {
+        <span class="line-ref">{{ finding.line_reference }}</span>
+      }
+      <span class="chevron" [class.open]="expanded">›</span>
+    </div>
+  </div>
+
+  <div class="card-title">{{ finding.title }}</div>
+
+  @if (expanded) {
+    <div class="card-body">
+      <div class="section">
+        <h4>Issue</h4>
+        <p>{{ finding.description }}</p>
+      </div>
+      <div class="section recommendation">
+        <h4>✅ Recommendation</h4>
+        <p>{{ finding.recommendation }}</p>
+      </div>
+    </div>
+  }
+</div>
